@@ -46,7 +46,7 @@
         <div class="row">
           <div class="stack-item">
             <label for="model">模型名称</label>
-            <input id="model" type="text" placeholder="gpt-4o-mini" />
+            <input id="model" type="text" placeholder="openrouter/auto" />
           </div>
           <div class="stack-item">
             <label for="temperature">temperature (0-2)</label>
@@ -66,6 +66,8 @@
     </main>
 
     <script>
+      const TOKEN_KEY = "admin_token";
+
       const loginCard = document.getElementById("loginCard");
       const editorCard = document.getElementById("editorCard");
 
@@ -93,6 +95,31 @@
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean);
+      }
+
+      function getToken() {
+        return localStorage.getItem(TOKEN_KEY) || "";
+      }
+
+      function setToken(token) {
+        localStorage.setItem(TOKEN_KEY, token);
+      }
+
+      function clearToken() {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+
+      async function authedFetch(url, options = {}) {
+        const token = getToken();
+        const headers = {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${token}`
+        };
+
+        return fetch(url, {
+          ...options,
+          headers
+        });
       }
 
       function showEditor() {
@@ -131,11 +158,19 @@
       }
 
       async function loadConfig() {
-        const resp = await fetch("/api/admin/agent-config");
-        if (!resp.ok) {
+        const token = getToken();
+        if (!token) {
           showLogin();
           return;
         }
+
+        const resp = await authedFetch("/api/admin/agent-config");
+        if (!resp.ok) {
+          clearToken();
+          showLogin();
+          return;
+        }
+
         const data = await resp.json();
         fillForm(data);
         showEditor();
@@ -154,11 +189,12 @@
           });
           const data = await resp.json();
 
-          if (!resp.ok) {
+          if (!resp.ok || !data.token) {
             loginMsg.textContent = data.error || "登录失败";
             return;
           }
 
+          setToken(data.token);
           loginMsg.textContent = "登录成功";
           await loadConfig();
         } catch {
@@ -177,7 +213,7 @@
         saveMsg.textContent = "保存中...";
 
         try {
-          const resp = await fetch("/api/admin/agent-config", {
+          const resp = await authedFetch("/api/admin/agent-config", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -198,7 +234,7 @@
       });
 
       logoutBtn.addEventListener("click", async () => {
-        await fetch("/api/admin/logout", { method: "POST" });
+        clearToken();
         showLogin();
       });
 
