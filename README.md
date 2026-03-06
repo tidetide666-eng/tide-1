@@ -10,23 +10,19 @@ npm install
 npx wrangler login
 ```
 
-### 2) 创建 KV（持久化保存管理员配置）
-```bash
-npx wrangler kv namespace create AGENT_KV
-```
-复制输出里的 `id`，替换 `wrangler.toml` 里：
-- `[[kv_namespaces]].id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"`
+### 2) 在 Cloudflare Dashboard 绑定资源
+- 在 Worker 的 `Bindings` 中添加：
+  - `KV namespace` 绑定：变量名 `AGENT_KV`，命名空间选你创建的 `agent-config`
+  - `Workers AI` 绑定：变量名 `AI`
 
 ### 3) 设置服务端密钥（在线环境）
 ```bash
-npx wrangler secret put LLM_API_KEY
 npx wrangler secret put PUBLIC_API_KEY
 npx wrangler secret put ADMIN_TOKEN_SECRET
 npx wrangler secret put ADMIN_PASSWORD
 ```
 
 说明：
-- `LLM_API_KEY`: 你的 OpenRouter key
 - `PUBLIC_API_KEY`: 公开 API 的调用密钥（你自己定义）
 - `ADMIN_TOKEN_SECRET`: 任意复杂字符串（建议 32 位以上）
 - `ADMIN_PASSWORD`: 管理员密码（会覆盖默认值）
@@ -59,3 +55,4 @@ curl -X POST "https://YOUR-URL.workers.dev/api/public/agent-chat" \\
 ## 说明
 - 这是纯在线运行，不需要你在本地常驻 `npm run dev`。
 - 只有改代码或改配置时，才需要再次执行 `npx wrangler deploy`。
+- 默认模型为 Cloudflare Workers AI: `@cf/meta/llama-3.1-8b-instruct`。

@@ -16,7 +16,7 @@ function defaultAgentConfig(env) {
       "如果有风险或不确定点，直接标注。"
     ],
     outputFormat: "先给结论，再给步骤；必要时用编号列表。",
-    model: env.MODEL_NAME || "openrouter/auto",
+    model: env.MODEL_NAME || "@cf/meta/llama-3.1-8b-instruct",
     temperature: 0.7
   };
 }
@@ -215,60 +215,42 @@ async function runAgent(env, userInput) {
   const cfg = await getAgentConfig(env);
   const systemPrompt = buildSystemPrompt(cfg);
 
-  const llmApiKey = String(env.LLM_API_KEY || "").trim();
-  if (!llmApiKey) {
-    throw new Error("Missing LLM_API_KEY");
+  if (!env.AI || typeof env.AI.run !== "function") {
+    throw new Error("Missing Workers AI binding: AI");
   }
 
-  const base = String(env.LLM_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
-  const url = `${base}/chat/completions`;
+  const model = cfg.model || env.MODEL_NAME || "@cf/meta/llama-3.1-8b-instruct";
+  const messages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userInput }
+  ];
 
-  const headers = {
-    Authorization: `Bearer ${llmApiKey}`,
-    "Content-Type": "application/json"
-  };
-
-  if (base.includes("openrouter.ai")) {
-    headers["X-Title"] = String(env.OPENROUTER_APP_NAME || "mini-agent-scaffold");
-    if (env.OPENROUTER_SITE_URL) {
-      headers["HTTP-Referer"] = String(env.OPENROUTER_SITE_URL);
-    }
-  }
-
-  const payload = {
-    model: cfg.model || env.MODEL_NAME || "openrouter/auto",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userInput }
-    ],
-    temperature: cfg.temperature
-  };
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  const raw = await resp.text();
   let data;
   try {
-    data = JSON.parse(raw);
+    data = await env.AI.run(model, {
+      messages,
+      temperature: cfg.temperature
+    });
   } catch {
-    data = { raw };
+    // Compatibility fallback for models that require a prompt field.
+    data = await env.AI.run(model, {
+      prompt: `${systemPrompt}\n\n用户输入：${userInput}\n\n请给出最终回答：`,
+      temperature: cfg.temperature
+    });
   }
 
-  if (!resp.ok) {
-    const message = data?.error?.message || data?.error || "模型调用失败";
-    throw new Error(String(message));
-  }
-
-  const answer = data?.choices?.[0]?.message?.content || "";
+  const answer =
+    (typeof data === "string" && data) ||
+    data?.response ||
+    data?.result?.response ||
+    data?.output_text ||
+    data?.choices?.[0]?.message?.content ||
+    "";
 
   return {
     answer,
     agentName: cfg.agentName,
-    usedModel: cfg.model || env.MODEL_NAME || "openrouter/auto",
+    usedModel: model,
     usedPrompt: systemPrompt
   };
 }
