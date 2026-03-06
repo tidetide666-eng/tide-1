@@ -38,6 +38,18 @@
         <p class="muted">在这里配置你的 Agent 脚手架。</p>
         <a class="link-btn" href="/admin">打开管理页面</a>
       </section>
+
+      <section class="card">
+        <h2>公开 API（工作页）</h2>
+        <p class="muted">把下面的地址和命令给前端/第三方系统即可调用你的 Agent。</p>
+        <label>API 地址</label>
+        <pre id="apiUrl">（加载中）</pre>
+        <button class="secondary" id="copyApiUrlBtn">复制 API 地址</button>
+
+        <label>curl 示例</label>
+        <pre id="curlExample">（加载中）</pre>
+        <button class="secondary" id="copyCurlBtn">复制 curl 命令</button>
+      </section>
     </main>
 
     <script>
@@ -46,6 +58,36 @@
       const answerEl = document.getElementById("answer");
       const agentNameEl = document.getElementById("agentName");
       const usedPromptEl = document.getElementById("usedPrompt");
+      const apiUrlEl = document.getElementById("apiUrl");
+      const curlExampleEl = document.getElementById("curlExample");
+      const copyApiUrlBtn = document.getElementById("copyApiUrlBtn");
+      const copyCurlBtn = document.getElementById("copyCurlBtn");
+
+      const publicApiUrl = `${window.location.origin}/api/public/agent-chat`;
+      const curlExample = `curl -X POST "${publicApiUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: YOUR_PUBLIC_API_KEY" \\
+  -d '{"userInput":"请给我一个3步推广方案"}'`;
+
+      apiUrlEl.textContent = publicApiUrl;
+      curlExampleEl.textContent = curlExample;
+
+      async function copyText(btn, text) {
+        const old = btn.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = "复制成功";
+        } catch {
+          btn.textContent = "复制失败";
+        } finally {
+          setTimeout(() => {
+            btn.textContent = old;
+          }, 1200);
+        }
+      }
+
+      copyApiUrlBtn.addEventListener("click", () => copyText(copyApiUrlBtn, publicApiUrl));
+      copyCurlBtn.addEventListener("click", () => copyText(copyCurlBtn, curlExample));
 
       sendBtn.addEventListener("click", async () => {
         const userInput = userInputEl.value.trim();
