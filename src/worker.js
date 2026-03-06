@@ -96,7 +96,7 @@ function buildSystemPrompt(config) {
 
 async function getAgentConfig(env) {
   if (!env.AGENT_KV) {
-    throw new Error("Missing KV binding: AGENT_KV");
+    return defaultAgentConfig(env);
   }
 
   const raw = await env.AGENT_KV.get(CONFIG_KEY);
@@ -111,7 +111,7 @@ async function getAgentConfig(env) {
 
 async function saveAgentConfig(env, input) {
   if (!env.AGENT_KV) {
-    throw new Error("Missing KV binding: AGENT_KV");
+    throw new Error("AGENT_KV 未绑定，当前配置无法持久化保存");
   }
 
   const cfg = sanitizeAgentConfig(input, env);
@@ -305,8 +305,12 @@ async function handleApi(request, env) {
     const cfg = sanitizeAgentConfig(body, env);
     if (!cfg.rolePrompt) return json({ error: "角色设定不能为空" }, 400);
 
-    const saved = await saveAgentConfig(env, cfg);
-    return json({ ...saved, compiledPrompt: buildSystemPrompt(saved) });
+    try {
+      const saved = await saveAgentConfig(env, cfg);
+      return json({ ...saved, compiledPrompt: buildSystemPrompt(saved) });
+    } catch (err) {
+      return json({ error: err.message || "保存失败" }, 500);
+    }
   }
 
   if (url.pathname === "/api/chat" && request.method === "POST") {
