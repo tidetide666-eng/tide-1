@@ -67,7 +67,7 @@
       const curlExample = `curl -X POST "${publicApiUrl}" \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: YOUR_PUBLIC_API_KEY" \\
-  -d '{"userInput":"请给我一个3步推广方案"}'`;
+  -d '{"userInput":"请给我一个3步推广方案","clientTimestampMs":1710000000000,"clientDateTime":"2026-03-07T12:34:56.000Z","clientLocalDateTime":"2026/3/7 20:34:56"}'`;
 
       apiUrlEl.textContent = publicApiUrl;
       curlExampleEl.textContent = curlExample;
@@ -89,6 +89,16 @@
       copyApiUrlBtn.addEventListener("click", () => copyText(copyApiUrlBtn, publicApiUrl));
       copyCurlBtn.addEventListener("click", () => copyText(copyCurlBtn, curlExample));
 
+      function buildPayload(userInput) {
+        const now = new Date();
+        return {
+          userInput,
+          clientTimestampMs: Date.now(),
+          clientDateTime: now.toISOString(),
+          clientLocalDateTime: now.toLocaleString("zh-CN", { hour12: false })
+        };
+      }
+
       sendBtn.addEventListener("click", async () => {
         const userInput = userInputEl.value.trim();
         if (!userInput) {
@@ -103,7 +113,7 @@
           const resp = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userInput })
+            body: JSON.stringify(buildPayload(userInput))
           });
           const data = await resp.json();
 
