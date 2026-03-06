@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agent 管理台</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card" id="loginCard">
+        <h1>管理员登录</h1>
+        <label for="username">账号</label>
+        <input id="username" type="text" placeholder="admin" value="admin" />
+
+        <label for="password">密码</label>
+        <input id="password" type="password" placeholder="请输入密码" value="123456" />
+
+        <button id="loginBtn">登录</button>
+        <p class="muted">默认账号：admin，默认密码：123456</p>
+        <p class="muted" id="loginMsg"></p>
+      </section>
+
+      <section class="card hidden" id="editorCard">
+        <h1>Mini Agent 脚手架配置</h1>
+        <p class="muted">这里的配置会自动拼接成 system prompt，并用于用户对话。</p>
+
+        <label for="agentName">Agent 名称</label>
+        <input id="agentName" type="text" placeholder="例如：营销策略助手" />
+
+        <label for="rolePrompt">角色设定</label>
+        <textarea id="rolePrompt" rows="4" placeholder="你是谁、擅长什么"></textarea>
+
+        <label for="objective">核心目标</label>
+        <textarea id="objective" rows="3" placeholder="你的主要任务是什么"></textarea>
+
+        <label for="guardrails">执行规则（每行一条）</label>
+        <textarea id="guardrails" rows="5" placeholder="例如：先给结论\n例如：不知道就说不知道"></textarea>
+
+        <label for="workflow">执行步骤（每行一步）</label>
+        <textarea id="workflow" rows="5" placeholder="例如：理解用户目标\n例如：给出方案"></textarea>
+
+        <label for="outputFormat">输出格式要求</label>
+        <textarea id="outputFormat" rows="3" placeholder="例如：先结论，再步骤"></textarea>
+
+        <div class="row">
+          <div class="stack-item">
+            <label for="model">模型名称</label>
+            <input id="model" type="text" placeholder="gpt-4o-mini" />
+          </div>
+          <div class="stack-item">
+            <label for="temperature">temperature (0-2)</label>
+            <input id="temperature" type="number" min="0" max="2" step="0.1" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button id="saveBtn">保存 Agent 配置</button>
+          <button class="secondary" id="logoutBtn">退出登录</button>
+        </div>
+        <p class="muted" id="saveMsg"></p>
+
+        <h2>拼接后的 System Prompt 预览</h2>
+        <pre id="compiledPrompt">（保存后显示）</pre>
+      </section>
+    </main>
+
+    <script>
+      const loginCard = document.getElementById("loginCard");
+      const editorCard = document.getElementById("editorCard");
+
+      const usernameEl = document.getElementById("username");
+      const passwordEl = document.getElementById("password");
+      const loginBtn = document.getElementById("loginBtn");
+      const loginMsg = document.getElementById("loginMsg");
+
+      const agentNameEl = document.getElementById("agentName");
+      const rolePromptEl = document.getElementById("rolePrompt");
+      const objectiveEl = document.getElementById("objective");
+      const guardrailsEl = document.getElementById("guardrails");
+      const workflowEl = document.getElementById("workflow");
+      const outputFormatEl = document.getElementById("outputFormat");
+      const modelEl = document.getElementById("model");
+      const temperatureEl = document.getElementById("temperature");
+      const compiledPromptEl = document.getElementById("compiledPrompt");
+
+      const saveBtn = document.getElementById("saveBtn");
+      const saveMsg = document.getElementById("saveMsg");
+      const logoutBtn = document.getElementById("logoutBtn");
+
+      function linesToArray(text) {
+        return text
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+      }
+
+      function showEditor() {
+        loginCard.classList.add("hidden");
+        editorCard.classList.remove("hidden");
+      }
+
+      function showLogin() {
+        editorCard.classList.add("hidden");
+        loginCard.classList.remove("hidden");
+      }
+
+      function fillForm(data) {
+        agentNameEl.value = data.agentName || "";
+        rolePromptEl.value = data.rolePrompt || "";
+        objectiveEl.value = data.objective || "";
+        guardrailsEl.value = (data.guardrails || []).join("\n");
+        workflowEl.value = (data.workflow || []).join("\n");
+        outputFormatEl.value = data.outputFormat || "";
+        modelEl.value = data.model || "";
+        temperatureEl.value = data.temperature ?? 0.7;
+        compiledPromptEl.textContent = data.compiledPrompt || "（暂无）";
+      }
+
+      function collectForm() {
+        return {
+          agentName: agentNameEl.value.trim(),
+          rolePrompt: rolePromptEl.value.trim(),
+          objective: objectiveEl.value.trim(),
+          guardrails: linesToArray(guardrailsEl.value),
+          workflow: linesToArray(workflowEl.value),
+          outputFormat: outputFormatEl.value.trim(),
+          model: modelEl.value.trim(),
+          temperature: Number(temperatureEl.value)
+        };
+      }
+
+      async function loadConfig() {
+        const resp = await fetch("/api/admin/agent-config");
+        if (!resp.ok) {
+          showLogin();
+          return;
+        }
+        const data = await resp.json();
+        fillForm(data);
+        showEditor();
+      }
+
+      loginBtn.addEventListener("click", async () => {
+        loginMsg.textContent = "登录中...";
+        const username = usernameEl.value.trim();
+        const password = passwordEl.value.trim();
+
+        try {
+          const resp = await fetch("/api/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            loginMsg.textContent = data.error || "登录失败";
+            return;
+          }
+
+          loginMsg.textContent = "登录成功";
+          await loadConfig();
+        } catch {
+          loginMsg.textContent = "网络错误";
+        }
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const payload = collectForm();
+        if (!payload.rolePrompt) {
+          saveMsg.textContent = "角色设定不能为空";
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveMsg.textContent = "保存中...";
+
+        try {
+          const resp = await fetch("/api/admin/agent-config", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            saveMsg.textContent = data.error || "保存失败";
+          } else {
+            saveMsg.textContent = "保存成功";
+            fillForm(data);
+          }
+        } catch {
+          saveMsg.textContent = "网络错误";
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      logoutBtn.addEventListener("click", async () => {
+        await fetch("/api/admin/logout", { method: "POST" });
+        showLogin();
+      });
+
+      loadConfig();
+    </script>
+  </body>
+</html>

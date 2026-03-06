@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mini Agent Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <h1>用户对话页面</h1>
+        <p class="muted">这里会调用你在管理页面配置好的 Agent。</p>
+
+        <label for="userInput">你的输入</label>
+        <textarea id="userInput" rows="6" placeholder="例如：请给我一个短视频带货脚本"></textarea>
+
+        <button id="sendBtn">发送给 Agent</button>
+
+        <div class="result-block">
+          <h2>模型返回</h2>
+          <pre id="answer">（还没有结果）</pre>
+        </div>
+
+        <div class="result-block">
+          <h2>本次使用的 Agent</h2>
+          <pre id="agentName">（还没有结果）</pre>
+        </div>
+
+        <div class="result-block">
+          <h2>本次拼接后的 System Prompt</h2>
+          <pre id="usedPrompt">（还没有结果）</pre>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>管理入口</h2>
+        <p class="muted">在这里配置你的 Agent 脚手架。</p>
+        <a class="link-btn" href="/admin">打开管理页面</a>
+      </section>
+    </main>
+
+    <script>
+      const sendBtn = document.getElementById("sendBtn");
+      const userInputEl = document.getElementById("userInput");
+      const answerEl = document.getElementById("answer");
+      const agentNameEl = document.getElementById("agentName");
+      const usedPromptEl = document.getElementById("usedPrompt");
+
+      sendBtn.addEventListener("click", async () => {
+        const userInput = userInputEl.value.trim();
+        if (!userInput) {
+          answerEl.textContent = "请输入内容";
+          return;
+        }
+
+        sendBtn.disabled = true;
+        sendBtn.textContent = "请求中...";
+
+        try {
+          const resp = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userInput })
+          });
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            answerEl.textContent = data.error || "请求失败";
+            agentNameEl.textContent = "-";
+            usedPromptEl.textContent = "-";
+          } else {
+            answerEl.textContent = data.answer || "（模型没有返回文本）";
+            agentNameEl.textContent = data.agentName || "Mini Agent";
+            usedPromptEl.textContent = data.usedPrompt || "（无）";
+          }
+        } catch {
+          answerEl.textContent = "网络错误，请稍后重试";
+          agentNameEl.textContent = "-";
+          usedPromptEl.textContent = "-";
+        } finally {
+          sendBtn.disabled = false;
+          sendBtn.textContent = "发送给 Agent";
+        }
+      });
+    </script>
+  </body>
+</html>
